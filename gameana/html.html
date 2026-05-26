@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<title>Retro Maze Game</title>
+
+<style>
+body{
+margin:0;
+background:#111;
+color:white;
+font-family:monospace;
+display:flex;
+justify-content:center;
+align-items:center;
+height:100vh;
+}
+
+#wrap{text-align:center;}
+
+#hud{
+display:flex;
+gap:25px;
+justify-content:center;
+margin-bottom:12px;
+font-size:20px;
+}
+
+canvas{
+background:#1c1c1c;
+border:4px solid #00ff88;
+image-rendering:pixelated;
+}
+</style>
+</head>
+<body>
+
+<div id="wrap">
+
+<div id="hud">
+<div>❤️ <span id="vidas">3</span></div>
+<div>💰 <span id="coins">0</span></div>
+<div>🎮 <span id="fase">1</span></div>
+<div>⏱️ <span id="tempo">0</span>s</div>
+</div>
+
+<canvas id="game"></canvas>
+
+</div>
+
+<script>
+
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
+
+const tile=32;
+
+let vidas=3;
+let fase=1;
+let tempo=0;
+
+setInterval(()=>{
+tempo++;
+document.getElementById("tempo").innerText=tempo;
+},1000);
+
+function beep(freq,time){
+
+const a=new(window.AudioContext||window.webkitAudioContext)();
+const osc=a.createOscillator();
+
+osc.type="square";
+osc.frequency.value=freq;
+
+osc.connect(a.destination);
+
+osc.start();
+
+setTimeout(()=>{
+osc.stop();
+a.close();
+},time);
+
+}
+
+const foto=new Image();
+foto.src="suaimagem.png";
+
+const levels=[
+
+[
+"####################",
+"#P....#.......C....#",
+"#.##..#.#####.###..#",
+"#....E#.....#......#",
+"###.######..#####..#",
+"#....C......#......#",
+"#..######...#..E...#",
+"#...........#......#",
+"#..######...#####..#",
+"#.......C..........#",
+"#..##########......#",
+"#..........E.......#",
+"#....C.............#",
+"#...............F..#",
+"####################"
+],
+
+[
+"####################",
+"#P....C.....E......#",
+"#.######.######.##.#",
+"#......#......#....#",
+"#..E...#.##...#.C..#",
+"#......#......#....#",
+"######.#.######....#",
+"#....C............F#",
+"#.######.######....#",
+"#.............E....#",
+"#....C.............#",
+"####################"
+]
+
+];
+
+let map=[];
+let player={x:1,y:1};
+let enemies=[];
+let coins=0;
+let totalCoins=0;
+let enemyTick=0;
+
+function loadLevel(){
+
+const raw=levels[(fase-1)%levels.length];
+
+map=raw.map(r=>r.split(''));
+
+enemies=[];
+coins=0;
+totalCoins=0;
+
+for(let y=0;y<map.length;y++){
+
+for(let x=0;x<map[y].length;x++){
+
+const c=map[y][x];
+
+if(c==="P"){
+player={x,y};
+map[y][x]=".";
+}
+
+if(c==="E"){
+enemies.push({
+x,y,
+dx:Math.random()<0.5?1:-1
+});
+map[y][x]=".";
+}
+
+if(c==="C"){
+totalCoins++;
+}
+
+}
+
+}
+
+canvas.width=map[0].length*tile;
+canvas.height=map.length*tile;
+
+document.getElementById("coins").innerText=coins+"/"+totalCoins;
+document.getElementById("fase").innerText=fase;
+
+}
+
+loadLevel();
+
+document.addEventListener("keydown",(e)=>{
+
+let dx=0;
+let dy=0;
+
+if(e.key==="ArrowUp") dy=-1;
+if(e.key==="ArrowDown") dy=1;
+if(e.key==="ArrowLeft") dx=-1;
+if(e.key==="ArrowRight") dx=1;
+
+move(dx,dy);
+
+});
+
+function move(dx,dy){
+
+const nx=player.x+dx;
+const ny=player.y+dy;
+
+if(!map[ny]) return;
+if(map[ny][nx]==="#") return;
+
+player.x=nx;
+player.y=ny;
+
+let cell=map[ny][nx];
+
+if(cell==="C"){
+
+map[ny][nx]=".";
+coins++;
+
+document.getElementById("coins").innerText=coins+"/"+totalCoins;
+
+beep(700,120);
+
+}
+
+if(cell==="F"){
+
+if(coins>=totalCoins){
+
+beep(1000,300);
+
+fase++;
+
+if(fase>5){
+
+document.body.innerHTML=`
+
+<style>
+
+body{
+margin:0;
+background:#111;
+display:flex;
+justify-content:center;
+align-items:center;
+height:100vh;
+font-family:monospace;
+color:white;
+
+body{
+margin:0;
+background:#111;
+display:flex;
+justify-content:center;
+align-items:center;
+height:100vh;
+font-family:monospace;
+color:white;
+text-align:center;
+flex-direction:column;
+}
+
+img{
+width:350px;
+max-width:90%;
+border:5px solid #00ff88;
+border-radius:12px;
+box-shadow:0 0 25px #00ff88;
+margin-top:20px;
+}
+
+h1{
+font-size:45px;
+color:#00ff88;
+}
+
+p{
+font-size:22px;
+}
+
+</style>
+
+<h1>🏆 VOCÊ ZEROU O JOGO! 🏆</h1>
+
+<p>Parabéns! Você completou todas as fases.</p>
+
+<img src="suaimagem.png">
+
+`;
+
+beep(1200,500);
+
+return;
+
+}
+
+loadLevel();
+
+}else{
+
+alert("Pegue todas moedas!");
+
+}
+
+}
+
+}
+
+function updateEnemies(){
+
+enemyTick++;
+
+if(enemyTick<25) return;
+
+enemyTick=0;
+
+enemies.forEach(e=>{
+
+let nx=e.x+e.dx;
+
+if(map[e.y][nx]==="#"){
+
+e.dx*=-1;
+
+}else{
+
+e.x=nx;
+
+}
+
+if(e.x===player.x && e.y===player.y){
+
+vidas--;
+
+document.getElementById("vidas").innerText=vidas;
+
+beep(180,250);
+
+player.x=1;
+player.y=1;
+
+if(vidas<=0){
+
+alert("☠️ GAME OVER");
+
+location.reload();
+
+}
+
+}
+
+});
+
+}
+
+function draw(){
+
+ctx.clearRect(0,0,canvas.width,canvas.height);
+
+for(let y=0;y<map.length;y++){
+
+for(let x=0;x<map[y].length;x++){
+
+let c=map[y][x];
+
+if(c==="#"){
+
+ctx.fillStyle="#00ff88";
+ctx.fillRect(x*tile,y*tile,tile,tile);
+
+}
+
+if(c==="C"){
+
+ctx.fillStyle="gold";
+
+ctx.beginPath();
+ctx.arc(
+x*tile+16,
+y*tile+16,
+8,
+0,
+Math.PI*2
+);
+ctx.fill();
+
+}
+
+if(c==="F"){
+
+if(foto.complete){
+
+ctx.drawImage(
+foto,
+x*tile+2,
+y*tile+2,
+28,
+28
+);
+
+}else{
+
+ctx.fillStyle="#00aaff";
+ctx.fillRect(
+x*tile+4,
+y*tile+4,
+24,
+24
+);
+
+}
+
+}
+
+}
+
+}
+
+ctx.fillStyle="cyan";
+
+ctx.fillRect(
+player.x*tile+4,
+player.y*tile+4,
+24,
+24
+);
+
+ctx.fillStyle="red";
+
+enemies.forEach(e=>{
+
+ctx.fillRect(
+e.x*tile+4,
+e.y*tile+4,
+24,
+24
+);
+
+});
+
+}
+
+function loop(){
+
+updateEnemies();
+draw();
+
+requestAnimationFrame(loop);
+
+}
+
+loop();
+
+</script>
+
+</body>
+</html>
